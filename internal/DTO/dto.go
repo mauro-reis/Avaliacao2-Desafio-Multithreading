@@ -1,5 +1,7 @@
 package dto
 
+// Classe DTO para inputs/outputs durante as comunicações.
+
 type CEPInputDTO struct {
 	Cep string `json:"cep"`
 }

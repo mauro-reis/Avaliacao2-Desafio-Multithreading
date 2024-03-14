@@ -18,8 +18,6 @@ func main() {
 	println("Info: Configuration file loaded.")
 	println("LIMITE_CONTAGEM:", config.LIMITE_CONTAGEM)
 
-	//TO DO: Verificar a possibilidade de criar um banco de dados MySql via docker e integrá-lo.
-
 	cepHandler := handlers.NewCepHandler()
 
 	r := chi.NewRouter()
@@ -31,13 +29,9 @@ func main() {
 	r.Use(middleware.WithValue("urlCep2", config.URL_CEP2))
 	r.Use(middleware.WithValue("LIMITE_CONTAGEM", config.LIMITE_CONTAGEM))
 
+	// Endpoint que ao acessado, este aciona um método que irá requisitar duas API's ao mesmo tempo.
 	r.Route("/cep", func(r chi.Router) {
-		// r.Get("/BrasilApi/{cep}", cepHandler.GetCEPBrasilApi)
-		r.Get("/{cep}", cepHandler.GetCEPBrasilApi)
-		r.Get("/ViaCep/{cep}", cepHandler.GetCEPViaCep)
 		r.Get("/buscacep/{cep}", cepHandler.BuscaCep)
 	})
-	// http.HandleFunc("/CepV1", BuscaCEPBrasilApi)
-	// http.HandleFunc("/CepV2", BuscaCEPViaCep)
 	http.ListenAndServe(":8080", r)
 }

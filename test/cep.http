@@ -1,2 +1,2 @@
-GET http://localhost:8080/cep/02138040 HTTP/1.1
+GET http://localhost:8080/cep/buscacep/02138-040 HTTP/1.1
 Content-Type: application/json

@@ -23,6 +23,9 @@ type conf struct {
 	TokenAuth       *jwtauth.JWTAuth
 }
 
+// Método que carrega as configurações de um arquivo.
+// O parâmetro de configuração mais importante é o "LIMITE_CONTAGEM",
+// pois nele é a quantidade de requisições a cada vez que é chamado o endpoint.
 func LoadConfig(path string) (*conf, error) {
 	viper.SetConfigName("app_config")
 	viper.SetConfigType("env")
@@ -41,8 +44,6 @@ func LoadConfig(path string) (*conf, error) {
 	}
 
 	cfg.TokenAuth = jwtauth.New("HS256", []byte(cfg.JWTSecret), nil)
-
-	println("url1: " + cfg.URL_CEP1)
 
 	return cfg, err
 }

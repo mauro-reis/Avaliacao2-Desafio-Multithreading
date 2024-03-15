@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -24,6 +23,7 @@ func NewCepHandler() *CepHandler {
 
 var c1 = make(chan dto.CEPBrasilAPIOutputDTO)
 var c2 = make(chan dto.CEPViaCepOutputDTO)
+var message string
 
 func (hand *CepHandler) GetCEPBrasilApi(w http.ResponseWriter, r *http.Request) {
 	cep := chi.URLParam(r, "cep")
@@ -37,7 +37,7 @@ func (hand *CepHandler) GetCEPBrasilApi(w http.ResponseWriter, r *http.Request) 
 	request, err := http.Get(urlCep)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(os.Stderr, "BuscaCEPBrasilApi. Erro na request: %v\n", err)
+		fmt.Printf("BuscaCEPBrasilApi. Erro na request: %v\n", err)
 	}
 	defer request.Body.Close()
 
@@ -47,8 +47,6 @@ func (hand *CepHandler) GetCEPBrasilApi(w http.ResponseWriter, r *http.Request) 
 		fmt.Fprintf(os.Stderr, "BuscaCEPBrasilApi. Erro na response: %v\n", err)
 	}
 
-	fmt.Println("servicerequest brasilapi.com.br:", string(response))
-
 	err = json.Unmarshal(response, &hand.CepBrasilAPI)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -56,13 +54,10 @@ func (hand *CepHandler) GetCEPBrasilApi(w http.ResponseWriter, r *http.Request) 
 	}
 
 	c1 <- hand.CepBrasilAPI
+	message = string(response)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(hand.CepBrasilAPI)
-	w.Write([]byte("servicerequest: brasilapi.com.br:\n" + string(response)))
-	//}
 }
 
 func (hand *CepHandler) GetCEPViaCep(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +71,7 @@ func (hand *CepHandler) GetCEPViaCep(w http.ResponseWriter, r *http.Request) {
 
 	request, err := http.Get(urlCep)
 	if err != nil {
-		fmt.Fprint(os.Stderr, "BuscaCEPViaCep. Erro na request: %v\n", err)
+		fmt.Printf("BuscaCEPViaCep. Erro na request: %v\n", err)
 	}
 	defer request.Body.Close()
 
@@ -85,45 +80,31 @@ func (hand *CepHandler) GetCEPViaCep(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(os.Stderr, "BuscaCEPViaCep. Erro na response: %v\n", err)
 	}
 
-	fmt.Println("servicerequest viacep.com.br:", string(response))
-
 	err = json.Unmarshal(response, &hand.CepViaCep)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "BuscaCEPViaCep. Erro ao deserializar: %v\n", err)
 	}
 
 	c2 <- hand.CepViaCep
+	message = string(response)
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(hand.CepViaCep)
-	w.Write([]byte("servicerequest: viacep.com.br:\n" + string(response)))
 }
 
 func (hand *CepHandler) BuscaCep(w http.ResponseWriter, r *http.Request) {
-	contador := r.Context().Value("LIMITE_CONTAGEM").(string)
-	intcontador, _ := strconv.Atoi(contador)
+	go hand.GetCEPBrasilApi(w, r)
+	go hand.GetCEPViaCep(w, r)
 
-	for i := 0; i < int(intcontador); i++ {
-		go hand.GetCEPBrasilApi(w, r)
-		go hand.GetCEPViaCep(w, r)
+	select {
+	case <-c1:
+		w.Write([]byte("Service request: brasilapi.com.br:\n" + message))
 
-		select {
-		case <-c1:
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
+	case <-c2:
+		w.Write([]byte("Service request: viacep.com.br:\n" + message))
 
-		case <-c2:
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
+	case <-time.After(time.Second * 1):
+		w.WriteHeader(http.StatusRequestTimeout)
 
-		case <-time.After(time.Second * 1):
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusRequestTimeout)
-			w.Write([]byte("Resposta cancelada por prolongar mais de 1 segundo.\n"))
-
-			fmt.Fprintf(os.Stderr, string(i)+"Resposta cancelada por prolongar mais de 1 segundo.\n")
-		}
+		fmt.Fprintf(os.Stderr, "Resposta cancelada por prolongar mais de 1 segundo.\n")
 	}
 }
